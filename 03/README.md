@@ -1,66 +1,86 @@
 
+```
+db.posts.find({},{date:true})
+```
 
+## Стадия $match
 
+```
+db.posts.aggregate([ 
+  { $match: {date: {$gte: "2015", $lt: "2016"}} } 
+]).pretty()
+```
 
-###Операторы для чисел.
+## Стадия $project
+
+```
+db.posts.aggregate([ 
+  {$match: { date: {$gte: "2015"}, date: {$lt: "2016"} }},
+  {$project: {title: "$title", isDraft: "$options.isDraft"}} 
+])
+```
+
+###Операции для чисел.
 Перевод температуры из Цельсия в Фарингейт.
 Формула перевода tF = tC * 1.8 + 32
 
-`db.weather.aggregate([{
-`  $project: {
-`    tK: {
-`      $add: [32, {$multiply: ["$temperature", 1.8]}]}
-`    }
-`}])
+```
+db.weather.aggregate([{
+  $project: {
+    tF: {
+      $add: [32, {$multiply: ["$temperature", 1.8]}]}
+    }
+}])
+```
 
-
-###Операторы для дат
-`db.posts.aggregate([{$project: {date: {$dayOfWeek: "$date"}}}])
-
-###Операторы для строк
-`db.posts.aggregate([{$project: {text: {$concat: ["Заголовок: <", "$title", ">. ", 'Содержание : ', "$body"]}}}])
+###Операции для строк
+```
+db.weather.aggregate([
+  { $project: {date: {$concat: [ {$substr: ["$year",0,4]}, '-', {$substr: ["$month",0,2]}, '-', {$substr: ["$day",0,2]} ]}}}
+])
+```
 
 #Выбор данных
 
 ##Группировка
 
-###Средняя температура по месяцам
+###Максимальная температура по годам
 ```
-db.weather.aggregate([{
-  $group: {
-    _id: {year: "$year", month: "$month"}, 
-    temperature: {$avg: "$temperature"}
-  }
-}])
+db.weather.aggregate([
+  {$group: {_id: "$year", maxT: {$max: "$temperature"}}}
+])	
 ```
-#Средняя температура по месяцам летом
+
+###Максимальная температура по месяцам
+```
+db.weather.aggregate([
+  {$group: {_id: "$month", maxT: {$max: "$temperature"}}}
+])	
+```
+
+### Массив измерений по дням
 
 ```
 db.weather.aggregate([
-  { 
-    $group: { 
-      _id: {year: "$year", month: "$month"}, 
-      temperature: {$max: "$temperature"} }
-  }, 
-  { 
-    $match: {"_id.year": 2014, "_id.month": {$in: [6,7,8]}}
-  } 
+  {$group: {_id: {year: "$year", month: "$month", day: "$day"}, t: {$push: "$temperature"}}}
 ])
 ```
 
-#Правда ли что средняя температура весной больше средней температуры осенью
-
+### Самый холодный день в году
 ```
+// такой метод не работает
 db.weather.aggregate([
-  { $match: {month: {$in: [3,4,5,9,10,11]}} }, 
-  { $project: {isSpring: {$or: [{$lte: ["$month", 5]}]}, temperature: true } },
-  { $group: {_id: "$isSpring", t: {$avg: "$temperature"}} }
-])
+  {$group: {_id: false, t: {$min: "$temperature"}}}
+])	
+
+db.weather.aggregate([
+  {$sort: {temperature: 1}},
+  {$group: {_id: false, year: {$first: "$year"}, month: {$first: "$month"}, day: {$first: "$day"}, temperature: {$first: "$temperature"} }}])
 ```
 
-###unwind
+##unwind
 
-#какой тег встречается чаще всего
+###какой тег встречается чаще всего
 
 ```
 db.posts.aggregate([
